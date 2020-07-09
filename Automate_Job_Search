@@ -1,0 +1,48 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jul  9 10:23:38 2020
+
+@author: oduma
+
+"""
+
+from bs4 import BeautifulSoup
+import requests
+from fuzzywuzzy import fuzz
+import pandas as pd
+
+# Get my resume in text
+with open('CV.txt', 'r') as file:
+    CV_text = file.read().replace('\n', '')
+
+# Get Job URLs on LinkedIn (Search words: 'Data Analyst', 'Seattle') and search through page 1-10
+job_link = []
+match_ratio = []
+for i in range(10):
+    search_URL = 'https://www.linkedin.com/jobs/search/?geoId=104116203&keywords=data%20analyst&location=Seattle%2C%20Washington%2C%20United%20States' + 'start=' + str(25*i)
+    search_page = requests.get(search_URL)
+    #print(search_page.content)
+    soup = BeautifulSoup(search_page.content, 'html.parser')
+    for link in soup.find_all('a'):
+        if 'https://www.linkedin.com/jobs/view/' in link.get('href'):
+            #print(link.get('href'))
+            job_link.append(link.get('href'))
+    
+# Get URLs for each job post and retrieve job descriptions
+for i in range(len(job_link)):
+    job_URL = job_link[i]
+    job_page = requests.get(job_URL)
+    soup = BeautifulSoup(job_page.content, 'html.parser')
+    tag = 'show-more-less-html__markup show-more-less-html__markup--clamp-after-5'
+    job_details = soup.find('div', class_= tag)
+    job_text = job_details.text.strip()    
+    # Compare the job description with my CV - Text matching analysis
+    ratio = fuzz.token_set_ratio(CV_text, job_text)
+    #ratio = fuzz.token_sort_ratio(CV_text, job_text)
+    match_ratio.append(ratio)
+    
+# Create DataFrame (optional)
+df = pd.DataFrame(job_link, columns =['job_link']) 
+df['match_ratio'] = match_ratio
+df.sort_values(by=['match_ratio'], ascending = False, inplace = True)
+print(df.head(10))
