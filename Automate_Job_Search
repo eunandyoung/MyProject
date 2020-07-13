@@ -15,9 +15,9 @@ import pandas as pd
 with open('CV.txt', 'r') as file:
     CV_text = file.read().replace('\n', '')
 
-# Get Job URLs on LinkedIn (Search words: 'Data Analyst', 'Seattle') and search through page 1-10
+# Get job URLs on LinkedIn (Search words: 'Data Analyst', 'Seattle') and search through page 1-10
 job_link = []
-match_ratio = []
+link_ratio = []
 for i in range(10):
     search_URL = 'https://www.linkedin.com/jobs/search/?geoId=104116203&keywords=data%20analyst&location=Seattle%2C%20Washington%2C%20United%20States' + 'start=' + str(25*i)
     search_page = requests.get(search_URL)
@@ -25,24 +25,31 @@ for i in range(10):
     soup = BeautifulSoup(search_page.content, 'html.parser')
     for link in soup.find_all('a'):
         if 'https://www.linkedin.com/jobs/view/' in link.get('href'):
-            #print(link.get('href'))
             job_link.append(link.get('href'))
     
-# Get URLs for each job post and retrieve job descriptions
+# Get job descriptions in each job link & filter to jobs from the last 2 weeks
 for i in range(len(job_link)):
     job_URL = job_link[i]
     job_page = requests.get(job_URL)
-    soup = BeautifulSoup(job_page.content, 'html.parser')
-    tag = 'show-more-less-html__markup show-more-less-html__markup--clamp-after-5'
-    job_details = soup.find('div', class_= tag)
-    job_text = job_details.text.strip()    
-    # Compare the job description with my CV - Text matching analysis
-    ratio = fuzz.token_set_ratio(CV_text, job_text)
-    #ratio = fuzz.token_sort_ratio(CV_text, job_text)
-    match_ratio.append(ratio)
+    html = str(job_page.content)
+    sub = 'datePosted'
+    index = html.find(sub)
+    post_date_str = html[index+13:index+23]
+    post_date = datetime.strptime(post_date_str, '%Y-%m-%d')
+    diff = date.today()-post_date.date()
+    if diff.days <= 15:
+        soup = BeautifulSoup(job_page.content, 'html.parser')
+        tag = 'show-more-less-html__markup show-more-less-html__markup--clamp-after-5'
+        job_details = soup.find('div', class_= tag)
+        job_text = job_details.text.strip()    
+        # Compare the job description with my CV - Text matching analysis
+        ratio = fuzz.token_set_ratio(CV_text, job_text)
+        #ratio = fuzz.token_sort_ratio(CV_text, job_text)
+        link_ratio.append([job_URL, ratio])
     
-# Create DataFrame (optional)
-df = pd.DataFrame(job_link, columns =['job_link']) 
-df['match_ratio'] = match_ratio
+# Create DataFrame & sort by match_ratio & remove duplicate links by unique job identifier
+df = pd.DataFrame(link_ratio, columns =['job_link', 'match_ratio'])
 df.sort_values(by=['match_ratio'], ascending = False, inplace = True)
+df['identifier'] = df['job_link'].str.split("?").str[0]
+df.drop_duplicates(subset ="identifier", inplace = True)
 print(df.head(10))
