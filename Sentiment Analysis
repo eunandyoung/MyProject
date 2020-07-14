@@ -13,6 +13,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 
+# Dataset: Amazon Musical Instruments Reviews on Kaggle (https://www.kaggle.com/eswarchandt/amazon-music-reviews)
 df = pd.read_csv("Musical_instruments_reviews.csv")
 #df.isnull().sum()
 #df.dropna(axis = 0, subset = ['reviewText'], inplace = True)    
