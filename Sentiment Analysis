@@ -1,0 +1,74 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Jul 13 14:56:14 2020
+
+@author: oduma
+"""
+import pandas as pd
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from textblob import TextBlob
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import MultinomialNB
+
+df = pd.read_csv("Musical_instruments_reviews.csv")
+#df.isnull().sum()
+#df.dropna(axis = 0, subset = ['reviewText'], inplace = True)    
+#df.overall.value_counts()
+#df.loc[df.overall >=4, 'sentiment'] = 1
+#df.loc[df.overall < 4, 'sentiment'] = 0
+#df.sentiment.value_counts()
+
+# Get text polarity using Textblob
+def textblob_polarity(text):
+    try:
+        return TextBlob(text).sentiment.polarity
+    except:
+        return None
+    
+df['tb_polarity'] = df['reviewText'].apply(textblob_polarity)
+tb_pos = df[(df.tb_polarity > 0) & (df.sentiment == 1)].asin.count()
+tb_neg = df[(df.tb_polarity < 0) & (df.sentiment == 0)].asin.count()
+total = df.asin.count()
+accuracy_tb = (tb_pos + tb_neg)/total
+
+# Get text polarity using vaderSentiment
+def vader_polarity(text):
+    try:
+        return analyser.polarity_scores(text).get('compound')
+    except:
+        return None
+    
+analyser = SentimentIntensityAnalyzer()
+df['vd_polarity'] = df['reviewText'].apply(vader_polarity)
+vd_pos = df[(df.vd_polarity >= 0.05) & (df.sentiment == 1)].asin.count()
+vd_neg = df[(df.vd_polarity <= -0.05) & (df.sentiment == 0)].asin.count()
+accuracy_vd = (vd_pos+vd_neg)/total
+
+# Use prediction models (Logistic Regression, Multinomial Naive Bayes)
+X = df.reviewText
+y = df.sentiment
+X_train, X_val, y_train, y_val = train_test_split(X, y, train_size = 0.75)
+
+cv = CountVectorizer()
+bow_x_train = cv.fit_transform(X_train)
+bow_x_val = cv.transform(X_val)
+#print(cv.get_feature_names())
+#print(X.toarray())
+
+lr = LogisticRegression(random_state = 0, max_iter=10000)
+lr.fit(bow_x_train, y_train)
+accuracy_lr = accuracy_score(y_val, lr.predict(bow_x_val))
+
+nb = MultinomialNB()
+nb.fit(bow_x_train, y_train)
+accuracy_nb = accuracy_score(y_val, nb.predict(bow_x_val))
+
+# Compare results
+print('Accuracy')
+print('Textblob: {}'.format(accuracy_tb))
+print('VaderSentiment: {}'.format(accuracy_vd))
+print('LinearRegression: {}'.format(accuracy_lr))
+print('MultinomialNB: {}'.format(accuracy_nb))
